@@ -1,0 +1,14 @@
+\clearpage
+
+# Introduction
+
+The famous *vinho verde* is a tasty wine from northern Portugal. The number of producers, and by consquence the number of different *vinho verde*, is very large. Therefore, it is hard to have an exhaustive overview of all the varieties. So that, it can be of great interest to find the physicochemical properties of a good wine and to identify a system able to predict the quality of a wine.
+
+The aim of this report consists in developping a model that may be used to identify the most influential explanatory variables to predict the wine quality. Then, we are looking for the best model in predicting wine quality.
+
+Classification and predictive modeling is a broad field of research in statistics and a lot of different methods are available to deal with that kind of issues. In this work, we will test and compare four among the most common methods: general linear model (GLM), decision tree, neural net and random forest. By comparing the results of those techniques, we will be able to identify the method providing the best result for the issue of wine classification.
+However, the best prediction depends on what we are looking for. The accuracy or the kappa are good indicators of the general quality of a model, but according to the aim of the analysis, other indicators such as sensitivity, specificity, positive and negative predictive values can be interesting. 
+
+From the point of view of potential purchasers, the interest of the model consists in giving the best chances to pick a good wine while minimizing the possibility to classify poor wines as good. As we coded *good* as *1* and *poor* as *0*, the probability of choosing a good wine is given by the negative predicted value (the reference category is the one that is naturally first, hence, *0*). In consequence, we decided to put an emphasis on the negative predicted value. However, following the instructions, we will always keep an eye on the general accuracy of the model. So, we will compare the strength of the models looking mainly at the accuracy and the negative predicted value. 
+
+In order to have a better idea of the issue, we will first present the data we use for the analysis and provide a first explanatory analysis. In a second part, we will present the methods we have used and explain the main principle of the general linear model, the decision tree, the neural network and the random forest. In the third part, we will present the results for each method. Finally, we will conclude by a summary of the strength and the weakness of each model and propose some ideas for further investigation. 

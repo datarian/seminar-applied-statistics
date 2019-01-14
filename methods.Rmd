@@ -1,0 +1,85 @@
+# Methods
+
+The following section describes the considered learning methods along with the respective settings used. The problem at hand suggests using a supervised learning method, as the structure of the data and hence the  response (target attribute) are known. We decided to study decision trees, neural networks and random forests. Additionally, we studied a GLM model for comparison with the learners.
+
+Special attention was also paid to the topic of sampling from the data to obtain training and test datasets.
+
+## Sampling
+
+### Training and test datasets
+The same training and test datasets were used for all methods. The training dataset used for fitting the models comprises 70 % of the initial data, leaving the remaining 30 % for testing the models for their prediction performance.
+
+The samples were drawn using the function `createDataPartition()` from package `caret` [@JSSv028i05]. This function preserves the response frequencies of the original data as it creates data splits within the groups of a categorical variable, as opposed to using the generic `sample()` method from base R, which samples completely random.
+
+### Dealing with imbalanced response variables
+
+As was shown in [Section 2.2](#response), the response in our case is very imbalanced. When models are fitted naively on such data, the prediction results are usually not satisfactory because the minority category is not well captured by the model. In these cases, accuracy tends to correspond to the fraction of the majority class.
+
+There exist different strategies to deal with imbalance. On algorithm-level, cost-sensitive approaches are popular. Less represented classes are assigned a higher cost for misclassification, which boosts their importance during the learning process. On data-level, different sampling approaches exist to mitigate imbalance. One approach is oversampling, where more observations are drawn from the minority class so as to better balance the response classes. It can be problematic to do so because there is a risk of over-fitting, i.e. it is possible that properties of the training sample are baked into the model and thus it will perform bad on predictions of new observations [@kotsiantis2006handling].
+
+In this analysis, a data-level approach was implemented for all methods that were fitted through `caret`. When training the models through `train()`, the option `sampling="up"` was passed in through the `trainControl` mechanism. This balances the response categories by oversampling the minority category *good*.
+
+## GLM
+
+Generalized liner model (GLM) extends the classical linear regression . In particular, it allows to consider categorical response variables. As for the classical framework, the model is based on the minimization of the mean squared error. For a binary response, the model provides the probability of being of one category for some given values of the explanatory variables. 
+
+The probabilities are then used to assign the observation to the corresponding category. Usually, if the probability is over 0.5, the observation will be predicted as 1 and as 0 if the probability is lower than 0.5. The cutoff at 0.5 will always provide the model with the best accuracy. However, it is possible to move this cutoff in function of the aim.
+
+In our case, we have tried three different cutoffs in order to see how the prediction evolves. In the first case, we take the classical 0.5 cutoff, predicting as good wines with a probability higher than 0.5 and as poor the wines with lower probability. In addition, we also considered two other cutoffs: one at 0.7 and one at 0.1.
+
+
+## Decision tree
+
+Decision trees are an intuitive approach that can be used for classification problems. Starting with the whole dataset, an initial split is searched that best reduces the impuritiy of the data (the variable that best separates the data based on a logical condition). On the resulting two branches, this procedure is repeated until only a small number of observations remain at the terminal nodes. Subsequently, the tree is pruned back. Pruning is usually done with either the so-called "1-SE method" or through cross-validation.
+Decision tree fitting for this case-study was performed with repeated cross-validation through `caret`.  We used 10-fold cross-validation (training dataset is split into 10 groups). One run of cross-validation consists of holding each of the groups back for testing once while using the remaining groups to fit a model, then using the retained group for testing. This procedure was repeated 10 times.
+
+The only additional option passed to `caret::train()` was the complexity parameter which was set to 2e-5. This effectively is a pre-pruning measure, limiting initial three growth.
+
+```{r detreecaret,eval=F,echo=F}
+
+cp.dectree <- 0.00002
+form <- as.formula(qual~.)
+
+control <- trainControl(method = "repeatedcv",
+                        number = 10,
+                        repeats = 10,
+                        classProbs=TRUE,
+                        sampling="up")
+
+set.seed(seed)
+dectree.caret <- train(form,
+                       data=wine.training,
+                       cp = cp.dectree,
+                       method="rpart",
+                       trControl=control)
+```
+
+## Neural network
+
+The neural network is a learning method of trial and error. The idea is to run the neural net and to improve progressively the result by changing the weights between layers. The inconvenience of the neural net is that it can be very difficult, not to say impossible, to understand the links and correlations done by the network. The neural network can be very efficient, but is in most of the cases hardly interpretable. 
+
+Neural net is a network of simulated neurons. It can also be considered as a nonlinear regression. Each layer consists in several neurons. A first layer contains as many neurons as input variables. These neurons take the values of the variables. Then, there are one or more hidden layers. Each neuron computes a weighted sum of the input values from the previous layer and from an intercept. The last layer is the response, each neuron corresponding to an answer. In our case, the last layer is composed of only one neuron indicating either *poor* or *good* as the predicted outcome.
+
+To obtain the best result, it is possible to play with the number of hidden layers, the number of neurons in each layer and the decay. The decay is a penalization parameter to avoid overfitting. 
+
+For this report, we only tested networks with one hidden layer. The fitting was done using `caret::train()` with 10-fold cross-validation. The data was pre-processed using the option `preProcess="range"` which scales values to the interval [0:1]. As neural networks are sensitive to differences in value ranges between input variables, this is a necessary step. Caret tries several combinations of number of neurons in the hidden layer and decays. The metric used to decide on the best network was accuracy.
+
+## Random forest
+
+Random forests are a collection of decision trees. The trees are grown slightly different than when growing a single decision tree. In random forests, the splits are only chosen from a random subset of fixed size of the available explanatory variables. This limits computation time. By growing many trees, it can be expected that still, all explanatory variables will be used in the overall forest. Predictions in a random forest are a majority vote of the whole forest on a supplied observation.
+
+For this report, the random forest was fitted using 10-fold cross-validation. An initial run with a size of 1000 trees showed that the error rates stabilised at just over 500 trees, so the forest size was reduced to 601 trees. Taking an odd number of trees eliminates ties in the votes.
+
+Initially, we calculated the number of variables to be used in splits as 3 (argument `mtry` in caret, by taking `floor(11/3)` as is recommended in literature). These results were not satisfactory, so we let `caret::train()` determine the optimal number of variables.
+
+```{r randforsettings, eval=F,echo=F}
+wine.rf.caret <- caret::train(qual~.,
+                         data=wine.training,
+                         method="rf",
+                         trace=T,
+                         ntree = 601,
+                         trControl=trainControl(
+                             method="cv",
+                             number=10,
+                             sampling = "up"))
+```

@@ -1,0 +1,128 @@
+---
+title: 'Predicting wine quality'
+subtitle: 'Statistical Learning Methods for Decision Making' 
+author: "Yoann Boget, Florian Hochstrasser"
+date: '`r Sys.Date()`'
+fontsize: 11pt
+bibliography: references.bib
+output:
+    pdf_document:
+        toc: true
+        toc_depth: 2
+        number_sections: true
+        includes:
+            in_header: latex/mystyles.sty
+            before_body: latex/before_body.tex
+        fig_caption: yes
+        fig_width: 10
+        keep_tex: yes
+        latex_engine: xelatex
+        dev: pdf
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(error=TRUE,
+                      warning=FALSE,
+                      message=FALSE,
+                      echo=FALSE,
+                      cache=FALSE,
+                      dpi=300,
+                      fig.width=10, # Default figure widths
+                      fig.asp=0.618,
+                      fig.align="center",
+                      fig.path = "./figures/",
+                      out.width = "0.75\\linewidth",
+                      crop = TRUE,
+                      tidy = TRUE)
+knitr::opts_knit$set(eval.after='fig.cap',
+                     digits=3)
+
+## a common hook for messages, warnings and errors
+hook_lst_bf = function(x, options) {
+    paste("\\begin{lstlisting}[basicstyle={\\bfseries}]\n", x, 
+        "\\end{lstlisting}\n", sep = "")
+}
+
+knitr::knit_hooks$set(source = function(x, options) {
+    paste("\\begin{lstlisting}[language=R,stepnumber=2,basicstyle=\\footnotesize]\n", x, 
+        "\\end{lstlisting}\n", sep = "")
+}, output = function(x, options) {
+    paste("\\begin{lstlisting}[basicstyle={\\ttfamily},basicstyle=\\footnotesize]\n", x, 
+        "\\end{lstlisting}\n", sep = "")
+}, warning = hook_lst_bf, message = hook_lst_bf, error = hook_lst_bf)
+
+
+inline_hook <- function (x) {
+  if (is.numeric(x)) {
+    res <- ifelse(x == round(x),
+      sprintf("%d", x),
+      sprintf("%.3f", x)
+    )
+    paste(res, collapse = ", ")
+  }
+}
+knitr::knit_hooks$set(inline = inline_hook,
+                      rgl = rgl::hook_rgl,
+                      crop = knitr::hook_pdfcrop,
+                      optipng = knitr::hook_optipng)
+options(knitr.table.format = "latex") 
+```
+
+```{r prepdata, include=FALSE, echo=FALSE}
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+library(knitr)
+library(kableExtra)
+library(data.table)
+
+# For 3d pca
+library(rgl)
+library(htmltools)
+setupKnitr()
+
+source("_RUN_THIS.R")
+
+# This is needed to compile the presentation:
+
+# Installing reveal.js presentation package / other github packages:
+# 1. install.packages("devtools")
+# 2. devtools::install_github("rstudio/revealjs")
+# 3. devtools::install_github("haozhu233/kableExtra")
+
+```
+
+```{r child="introduction.Rmd"}
+```
+
+
+```{r child="eda.Rmd"}
+```
+
+
+```{r child="methods.Rmd"}
+```
+
+
+```{r child="results.Rmd"}
+```
+
+
+```{r child="conclusions.Rmd"}
+```
+
+# References
+
+<div id="refs"></div>
+
+\clearpage
+
+# Appendix
+
+## R session info
+
+The following output details the exact environment used for the calculations and result display of this report.
+
+```{r sessioninfo, results="markup", tidy=T,source=T}
+print(sessionInfo(),locale=F)
+```

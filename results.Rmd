@@ -1,0 +1,226 @@
+# Results
+
+This section describes the obtained models and gives some of their perfromance measures. A comparison of their performance and an ultimate rating can be found in the section [5.2 Comparison of method results](#comparison-of-method-results).
+
+## GLM
+
+### Model
+
+The logarithmic regression confirms the tendencies of the exploratory analysis. The coefficients with the highest significant differences between good and poor wines are sulphates, alcohol, fixed- and volatile acidity. After fitting a full model, the three variables citric acid, free.sulfur.dioxide and pH not significant at $\alpha = 0.05$ were removed to build a reduced model for predictions. Table \ref{tabglm} shows variables with their coefficients and the p-values of the final model:
+
+\begin{table}[!h]
+    \caption{\label{tabglm}Coefficients and their p-values for each variable of the final GLM model.}
+    \centering  
+    \begin{tabular}{lll} 
+	  \toprule
+      Variable & Coefficient  & P-value \\ \midrule
+      Intercept &	2.730e+02 &	0.014192	 \\
+      fixed acidity & 3.640e-01 &	0.000150	 \\ 
+      volatile.acidity &	-2.740e+00 &	0.000287	 \\ 
+      residual.sugar &	2.351e-01 &	0.002487	 \\
+      Ichlorides &	-1.039e+01 &	0.034468	 \\
+      total.sulfur.dioxide &	-1.007e-02 &	0.005895	 \\
+      density &	-2.881e+02 & 0.009994	 \\
+      sulphates &	3.513e+00 &	5.44e-09	 \\
+      alcohol &	7.905e-01 &	6.13e-09	 \\ \bottomrule
+    \end{tabular}
+\end{table}
+
+
+### Comparison of different cutoff levels
+
+A method to tune the resulting GLM model is to change the cutoff level. This is the threshold value for predictions where they are separated into the response categories.
+
+First, we analyzed the data with the classical cutoff at 0.5. The predictions provided by this model are quite good. The accuracy lays at 0.875.
+
+Second, we tried to change the cutoff in order to see if we were able to improve some of the indicators. Of course, moving the cutoff up will mechanically increase the negative predictive value and reduce the specificity. In the opposite, moving it down will weaken the negative predictive value and growth the specificity. 
+
+We present here two attempts with cutoff values at 0.7 and 0.1, so that it illustrates the changes. Surprisingly, moving the cutoff to 0.7 does not change the accuracy (0.875 ). Changing the cutoff does not increase the number of mistakes in that case. In the opposite, taking a cutoff at 0.1 lets the accuracy fall to 0.72. The changes in negative predicted value are very important. Putting the cutoff at 0.7 increases it to 0.67, making this model the best one with respect to this criterium. In the opposite, the cutoff at 0.1 has a terrible negative predicted value. We observe the reverse phenomenon for specificity (also compare to [5.2 Comparison of Method Results](#comparison-of-method-results) for details). 
+
+```{r crossTabReg1, results="asis", echo=F, cache=T}
+
+glmcomparison <- cbind(conf.mat.glm1$table,
+                       conf.mat.glm2$table,
+                       conf.mat.glm3$table)
+
+kable(glmcomparison, booktabs=T,
+      caption = "Comparison of confusion matrices for the GLM approach at different cutoffs. Predictions are given in rows, while reference is shown in columns.") %>%
+    kable_styling(full_width = F,
+                  latex_options = c("hold_position"),
+                  position = "center") %>%
+
+    add_header_above(c(" " = 1,
+                       "Cutoff: 0.5" = 2,
+                       "Cutoff: 0.7" = 2,
+                       "Cutoff: 0.1" = 2)) %>%
+    add_header_above(c(" " = 1, "Reference" = 6),bold=T)
+
+```
+
+## Decision tree
+
+```{r calculatedecisiontree, cache=T, results='hide'}
+
+# run here so we can cache the results
+
+cp.dectree <- 0.00002
+form <- as.formula(qual~.)
+
+control <- trainControl(method = "repeatedcv",
+                        number = 10,
+                        repeats = 10,
+                        classProbs=TRUE,
+                        sampling="up")
+
+set.seed(seed)
+dectree.caret <- train(form,
+                       data=wine.training,
+                       cp = cp.dectree,
+                       method="rpart",
+                       trControl=control)
+
+showPrunedDecisionTree <- function(){
+    rpart.plot(dectree.caret$finalModel,
+               box.palette = viridis_pal(alpha=0.6)(8))
+}
+
+wine.dectree.important <- dectree.caret$finalModel$variable.importance %>%
+    as.data.frame()
+colnames(wine.dectree.important) <- c("Importance")
+
+wine.dectree.important <- wine.dectree.important %>%
+    rownames_to_column('explanatory') %>%
+    top_n(3,Importance) %>%
+    select(explanatory,Importance)
+
+dectree.caret.pred <- predict(dectree.caret, wine.test)
+
+conf.mat.dectree <- confusionMatrix(dectree.caret.pred,as.factor(wine.test$qual))
+accuracy.dectree <- conf.mat.dectree$overall[1]
+accuracy.balanced.dectree <- conf.mat.dectree$byClass[11]
+sensitivity.dectree <- conf.mat.dectree$byClass[1]
+specificity.dectree <- conf.mat.dectree$byClass[2]
+negpredval.dectree <- conf.mat.dectree$byClass[4]
+```
+
+The obtained decision tree (see Figure \ref{fig:prunedtree}) is of size 3. We see a non-linearity with alcohol appearing twice as the criterion. The prediction performance of the tree was not satisfactory. Achieved accuracy was at `r conf.mat.dectree$overall[1]`, which was low compared to the best performers, and negative predicted value only reached `r conf.mat.dectree$byClass[4]`. This means that many poor wines were predicted good.
+
+
+```{r prunedtree, fig.cap="Pruned decision tree.", cache=T}
+showPrunedDecisionTree()
+```
+
+
+The three most important variables found are shown in Table \ref{tab:importantdectree}. The measure "Importance" refers to the mean decrease in gini coefficient due to each variable.
+
+````{r importantdectree, results="asis", cache=T}
+kable(wine.dectree.important, booktabs=T,
+      caption = "Important variables determined through the decision tree method.") %>% kable_styling(full_width = F,
+                  latex_options = c("hold_position"),
+                  position = "center")
+```
+
+
+## Neural network
+
+We obtained the best accuracy for a neural net containing 5 neurons in the hidden layer and a decay of 1e-4. The network is shown in Figure \ref{fig:net}, the line weights representing the magnitude of weights for the connections between the neurons. Purple lines are poor wines, the good wines are coded yellow.
+
+```{r net, fig.cap="Structure of the neural net.", cache=T}
+
+pal <- viridis(8)
+plotnet(nnetFit,  circle_col= "#277F8EFF", pos_col="#FDE725FF", neg_col= "#440154FF",  alpha.val=0.7)
+
+```
+
+Neural networks are often very efficient, but in our case-study the result is quite disappointing (see Table \ref{tab:nnet-results}). As will be shown in the conclusion, the neural network is the second worst for accuracy and negative predictive value. Its results are not bad for specificity and sensitivity without being exceptionally good neither. Since neural networks are hard to interpret, we are not able to explain its bad performance in our case.
+
+```{r nnet-results, cache=T}
+kable(confusionMatrix(wine.nnet.pred.test,wine.test$qual)$table,
+      booktabs=T,
+      caption = "Confusion matrix for predicted wines using the neural network.") %>%
+    kable_styling(full_width = F,
+                  latex_options = c("hold_position"),
+                  position = "center")
+
+```
+
+The important variables identified by the neural network are shown in Table \ref{tab:nnetimp}.
+
+```{r nnetimp}
+varimp.nn <- varImp(nnetFit)$importance %>% rownames_to_column("var") %>% top_n(3,Overall) %>% rename(Explanatory=var)
+
+kable(varimp.nn,booktabs=T,
+      caption="Important variables determined through the neural network method.") %>%
+    kable_styling(full_width = F,
+                  latex_options = c("hold_position"),
+                  position = "center")
+
+```
+
+
+## Random forest
+
+For the random forest, the results with the training dataset look very promising . The error rate for good wine prediction dropped to zero very fast, meaning that on the training dataset, no misclassification for good wines was present (see Figure \ref{fig:randforresults}).
+
+With accuracy as the performance measure, mtry was found at 6, producing an accuracy of 0.905.
+
+```{r randforresults, cache=T,echo=F,results="hidden", fig.cap="Convergence of error rates for the fitted random forest. For good predicitions, the error rate drops to zero very fast. At slightly above 500 trees, the error rates stabilize for poor prediction and out-of-box."}
+
+# Run this code here so we can cache and speed up rendering.
+set.seed(seed)
+wine.rf.caret <- caret::train(qual~.,
+                         data=wine.training,
+                         method="rf",
+                         trace=T,
+                         ntree = 601,
+                         trControl=trainControl(
+                             method="cv",
+                             number=10,
+                             sampling = "up"))
+
+wine.rf.importantvars <- wine.rf.caret$finalModel$importance %>%
+    as.data.frame() %>%
+    rownames_to_column('explanatory')%>%
+    top_n(3,MeanDecreaseGini) %>%
+    select(explanatory,Importance=MeanDecreaseGini)
+
+wine.rf.predict <- predict(wine.rf.caret, wine.test)
+
+conf.mat.rf <- confusionMatrix(wine.rf.predict,as.factor(wine.test$qual))
+accuracy.rf <- conf.mat.rf$overall[1]
+accuracy.balanced.rf <- conf.mat.rf$byClass[11]
+sensitivity.rf <- conf.mat.rf$byClass[1]
+specificity.rf <- conf.mat.rf$byClass[2]
+negpredval.rf <- conf.mat.rf$byClass[4]
+
+
+oobData = as.data.frame(wine.rf.caret$finalModel$err.rate)
+oobData$trees <- seq(1:nrow(oobData))
+oobData = melt(oobData, id.vars = "trees")
+setnames(oobData, "value", "error")
+
+# Plot using ggplot
+ggplot(data = oobData, aes(x = trees, y = error, color = variable)) + geom_line() + scale_color_viridis_d() + theme(legend.justification = c(1,1),legend.position = c(0.98,0.98))
+
+```
+
+Prediction performance measured on the test data was no longer perfect (see Table \ref{tab:ranforconftest}). This is an indication of overfitting. This means that the random forest was trained very well on the exact features of the good wines in the training dataset, but is not able to accurately predict good wines in the test dataset. Still, the results are among the best compared to all other methods studied, as will be discussed in detail in the conclusions.
+
+```{r ranforconftest, cache=T}
+kable(confusionMatrix(wine.rf.predict,wine.test$qual)$table,
+      booktabs=T,
+      caption = "Confusion matrix for predicted wines using the random forest.") %>%
+    kable_styling(full_width = F,
+                  latex_options = c("hold_position"),
+                  position = "center")
+```
+
+The important variables found for the random forest are shown in \ref{tab:rfimportantvars}.
+
+```{r rfimportantvars, results="asis", cache=T}
+kable(wine.rf.importantvars, booktabs=T,
+      caption = "The 3 most important variables in the random forest.") %>%
+    kable_styling(full_width = F,
+                  latex_options = c("hold_position"),
+                  position = "center")
+```

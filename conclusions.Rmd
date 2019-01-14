@@ -1,0 +1,74 @@
+# Conclusions
+
+## Oversampling
+
+The approach of oversampling from the minority class yielded very good results in the case of the random forest. Comparison with initial trials without oversampling (not shown in this report) showed a large improvement in specificity and overall accuracy. However, the issue of oversampling became evident by comparison of the confusion matrices for training and test data. Still, the results with oversampling are promising.
+
+## Comparison of method results
+
+As stated in the introduction, our goal was to find the best model for predicting a good wine while minimizing the probability of rating a poor wine as good. This corresponds to the best negative predictive value as the category good is coded as *1* in the data and is thus interpreted as the negative case when fitting the different models.
+
+The results of the learning methods studied are presented in Table \ref{tab:methodcomparison}. The color code helps to identify the methods with overall high values. 
+
+Considering the negative predicted value, the best method is GLM with a cutoff at 0.7. The high cutoff, however, comes at a price: Overall, only few wines are predicted to be of good quality (see \ref{tab:crossTabReg1})indicated by the very poor specificity. Even if the results are quite good compared with other methods, the negative predictive value lays quite low.
+
+Overall, the random forest performed quite good. It's negative predicted value is lower than GLM with a cutoff of 0.7, which in our definition of the criterum to determine the winner means it is on second rank. It's superior accuracy and good performance on specificity however mean that it might be the better choice.
+
+It is obvious that GLM with a cutoff at 0.1, the decision tree and the neural network performed not satisfactory. GLM with the cutoff at 0.5 is somewhere between, which is noteworthy. A relatively simple model, naively employed, performed better than or at least comparable to elaborate learning methods.
+
+```{r methodcomparison, results='asis'}
+
+glm1 <- c(negpredval.glm1,accuracy.glm1,sensitivity.glm1,specificity.glm1)
+glm2 <- c(negpredval.glm2,accuracy.glm2,sensitivity.glm2,specificity.glm2)
+glm3 <- c(negpredval.glm3,accuracy.glm3,sensitivity.glm3,specificity.glm3)
+dectree <- c(negpredval.dectree, accuracy.dectree, sensitivity.dectree,specificity.dectree)
+randfor <- c(negpredval.rf,accuracy.rf,sensitivity.rf,specificity.rf)
+nnet <- c(negpredval.nnet,accuracy.nnet,sensitivity.nnet,specificity.nnet)
+
+
+methodcomparisondf <- data.frame(cbind(glm1,glm2, glm3,dectree,randfor,nnet)) %>% round(digits=3)
+colnames(methodcomparisondf) <- c("GLM","GLM 0.7","GLM 0.1", "Dec. Tree", "Rand. For.", "N-Net")
+
+for(i in 1:nrow(methodcomparisondf)){
+    #cell <- which.max(methodcomparisondf[i,])
+    methodcomparisondf[i,] <- cell_spec(methodcomparisondf[i,],
+                                            "latex",
+                                            background = spec_color(as.numeric(methodcomparisondf[i,]),end=0.9,direction =-1),
+                                            color="white",
+                                            bold=T)
+}
+
+kable(methodcomparisondf, digits = 3, booktabs = T,
+      caption = "Direct comparison of the performance of all the learning methods studied. Darker cells indicate better values, green and yellow cells lower ones.",
+      escape = F) %>%
+    kable_styling(full_width = F,
+                  latex_options = c("hold_position", "scaled_down"),
+                  position = "center")
+```
+
+
+## Important variables
+
+Sulphates was present in the top 3 of each method, while alcohol was among the 3 most important variables in all methods but the neural network. Following these two, we have seen chlorides, citric.acid, density, fixed.acidity and volatile acidity once (see Figure \ref{fig:impvarcomp}). The only method that is lacking sulphates is the neural network. Given the opaque nature of neural network fitting, it is not possible for us to indicate possible reasons for this observation.
+
+```{r impvarcomp, fig.cap="Aggregated important variables over all methods studied. For each method, the top 3 variables were extracted and their total occurrence counted.", results='asis'}
+varimp.rf <- varImp(wine.rf.caret)$importance %>% rownames_to_column("var") %>% top_n(3,Overall)
+varimp.dt <- varImp(dectree.caret)$importance %>% rownames_to_column("var") %>% top_n(3,Overall)
+varimp.nn <- varImp(nnetFit)$importance %>% rownames_to_column("var") %>% top_n(3,Overall)
+varimp.glm <- varImp(rega2) %>% rownames_to_column("var") %>% top_n(3,Overall)
+
+aggregated <- rbind(varimp.rf,varimp.dt,varimp.nn,varimp.glm) %>% mutate(var = as.factor(var)) %>% count(var) %>%  rename(Explanatory = var, Occurrences=n) %>% arrange(desc(Occurrences))
+
+ggplot(aggregated, aes(x=reorder(aggregated$Explanatory,aggregated$Occurrences,function(x)-max(x)),y=Occurrences)) +
+    geom_col(fill=pal[1]) + xlab("Explanatory")
+
+```
+
+## Outlook
+
+In future analyses, it would be interesting to also look at other sampling techniques often advocated for imbalanced response categories, like SMOTE (synthetic minority over-sampling technique) [@chawla2002smote] or ROSE (random over-sampling examples) [@lunardon2014rose]. 
+
+Furthermore, a comparison with cost-sensitive approaches could be performed as a different way of dealing with imbalance.
+
+It would also be interesting to consider different performance metrics. Especially ROC seems to be a popular metric for imbalanced response problems.
+

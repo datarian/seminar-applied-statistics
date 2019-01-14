@@ -1,0 +1,73 @@
+# Data
+
+In this section, an exploratory data analysis is conducted. The results help to draw first conclusions about how to employ the learning methods later on.
+
+## Structure
+
+The data at hand originates from a famous dataset on Portuguese red and white wines and is available on the website of the UCI Machine Learning repository ^[https://archive.ics.uci.edu/ml/datasets/Wine+Quality]. In this analysis, a subset is used. It comprises `r nrow(wine.trans)` observations.
+
+The dataset studied consists of 11 continuous explanatory variables and a categorical response variable with 8 levels. The 11 explanatory variables describe physicochemical properties of the wines. Their respective values range in the orders of 1e-01 to 1e02. 
+
+## Response
+
+The response variable describes the quality of wines. It is an ordered categorical variable attributing a quality grade. The range in the data lies between 3 and 8. The cutoff for the quality is arbitrarily set at 7, meaning that we classified as *good* wines graded 7 or 8. The wines with a lower score are classified as *poor*. Before recoding, most of the wines are actually of medium quality, there are only few wines with a rating of 4 or less (see Figure \ref{fig:response_boxplot}, left). After recoding, the response is markedly unbalanced, since only `r sum(wine.trans$qual=="good")` of the observations fall into the category *good* and `r sum(wine.trans$qual=="poor")` in the category *poor* representing respectively 13.57 % and 86.43 %  (see Figure \ref{fig:response_boxplot}, right).
+
+```{r response_boxplot, fig.cap="Frequency of response categories before recoding (left) and after recoding (right).",out.width="\\linewidth"}
+
+grid.arrange(
+    response_orig_hist,
+    response_boxplot,
+    nrow = 1,
+    widths=c(0.5,0.5)
+)
+
+```
+
+
+## Explanatory Variables
+
+The explanatory variables contain information about the physicochemical composition of the wines. The dataset provides measures for the following 11 constituents: fixed acidity, volatile acidity, citric acid, residual sugar, chlorides, free sulfur dioxide, total sulfur dioxide, density, pH, sulphates and alcohol. All these variables are numerical. There is no missing value.
+
+Boxplots for all variables are shown in Figure \ref{fig:explanatory_boxplots}. It is evident that most variables have outliers. From the shape of the IQR (inner quartile range), we can see evidence that some variables seem to be clearly not normally distributed.
+
+The boxplots allow to identify important variables where a marked difference in the distribution of variables is visible. For alcohol, this is most obvious. Volatile acidity and sulphates also appear to enable a good distinction between poor and good wines. In the opposite, pH, density and residual sugar look very similar for the two groups. 
+
+```{r explanatory_boxplots, fig.cap="Boxplots of the explanatory variables by response category. The values were scaled to the interval [0:1]. Each variable is grouped by response category. The better the separation of the inner quartile range of the boxplots of a given variable, the better the variable is suited to separate observations by category."}
+ggplot(boxplot_data,aes(x=explanatory,y=log10(value+1))) +
+    geom_boxplot(aes(fill=qual)) +
+    theme(axis.text.x = element_text(angle=20,vjust=0.5,hjust=1)) +
+    scale_fill_viridis(discrete = T,alpha = 0.7) +
+    ylab("Scaled data") + xlab("Variable") +
+    theme(legend.position = c(0.98,0.98),
+          legend.justification = c(1,1),
+          axis.title.x = element_text(margin = ggplot2::margin(10,0,0,0)))
+```
+
+## Correlations
+
+In Figure \ref{fig:correlations}, the correlations between explanatory variables are shown. The correlations can be easily deduced with chemical reasoning. There is a cluster of negative correlations between variables that describe acidity and pH. Lower pH means more acidity. Free sulfur is positively correlated with total sulfur as the former is a fraction of the total sulfur. We also see correlations between density and various variables. Molecules that are heavier than water have a positive correlation with density, those lighter have a negative correlation.
+
+```{r correlations, fig.cap="Correlations between explanatory variables. The size of the circles as well as their color indicates the strength and nature of correlation (positive = purple, negative = yellow, bigger = stronger). Correlations not significant at $\\protect\\alpha = 0.05$ are crossed out.", cache=T}
+ggcorrplot(cor(wine.trans[,-12],method = "spearman"), p.mat = cor_pmat(wine.trans[,-12]), hc.order = TRUE, type = "lower", method="circle") + scale_fill_viridis_c() + theme(axis.text.x = element_text(angle=30,vjust=0.5,hjust=1))
+```
+
+## PCA
+
+In order to have a better representation of the data, we decided to plot a principal component analysis (PCA), presented in Figure \ref{fig:pca}. Since the classical two dimensional PCA represented a quite poor proportion of the variance, we decided to plot a 3D PCA, representing about 60% of the variance. The yellow spheres represent good wines, the purple ones poor wines. The PCA shows a region where good wines are concentrated and a region with almost only poor wines. However, we see there is an overlap of good and poor wines. This suggests that it could be quite difficult to separate the two categories. The PCA also suggests that some variables are more important than others to explain wine quality. The alcohol rate variable points in the region of good wines. It may be the case for the sulphates and citric acidity, but it is less clear. The volatile acidity points in the opposite direction suggesting an inverse correlation with wine quality.
+
+```{r pca, rgl=T,dev='png', fig.width=15, fig.asp=1, optipng=T, cache=T, results='hide', fig.cap="Three-dimesional principal component analysis. The purple spheres represent poor quality wines, the yellow spheres indicate wines of good quality. Clearly, there are two regions with mostly poor and mostly good wines and an overlapping region. We can identify alcohol, sulphates and citric acid and in the opposed direction volatile acidity and density as important variables to separate the categories.", out.width="\\linewidth"}
+rglset <- readRDS("data/3dpca-settings.Rds")
+pca3d(pca2, biplot=T, group = wine.trans$qual, palette = c(pal[1],pal[8]), axes.color = "grey", shape="sphere",  radius = 0.5)
+par3d(viewport=rglset$viewport,
+      zoom=rglset$zoom,
+      userMatrix=rglset$userMatrix,
+      observer = rglset$observer,
+      bbox=rglset$bbox,
+      windowRect = rglset$windowRect,
+      FOV = rglset$FOV,
+      scale = rglset$scale,
+      family = "sans",
+      font = 2,
+      cex=1.8)
+
+```
